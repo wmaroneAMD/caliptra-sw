@@ -18,8 +18,7 @@ fn main() {
 
     // Generate Output file
     let out_file = PathBuf::from(&crate_dir)
-        .join("../../target")
-        .join(std::env::var("PROFILE").unwrap())
+        .join("out")
         .join("caliptra_model.h");
 
     // Generate caliptra_model.h

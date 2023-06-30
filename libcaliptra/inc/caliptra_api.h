@@ -1,9 +1,19 @@
 // Licensed under the Apache-2.0 license
-#ifndef CALIPTRA_API_H
-#define CALIPTRA_API_H
+#pragma once
 
 #include <stdint.h>
-#include "caliptra_model.h"
+#include <stdbool.h>
+
+typedef struct caliptra_buffer {
+  const uint8_t *data;
+  uintptr_t len;
+} caliptra_buffer;
+
+typedef struct caliptra_init_params {
+  struct caliptra_buffer rom;
+  struct caliptra_buffer dccm;
+  struct caliptra_buffer iccm;
+} caliptra_init_params;
 
 enum DeviceLifecycle {
     Unprovisioned = 0,
@@ -27,16 +37,16 @@ struct caliptra_fuses {
     enum DeviceLifecycle life_cycle;
 };
 
+int caliptra_init(struct caliptra_init_params *params);
+
 // Initialize Caliptra fuses prior to boot
-int caliptra_init_fuses(struct caliptra_model *model, struct caliptra_fuses *fuses);
+int caliptra_init_fuses(struct caliptra_fuses *fuses);
 
 // Write into Caliptra BootFSM Go Register
-int caliptra_bootfsm_go(struct caliptra_model *model);
+int caliptra_bootfsm_go();
 
 // Upload Caliptra Firmware
-int caliptra_upload_fw(struct caliptra_model *model, struct caliptra_buffer *fw_buffer);
+int caliptra_upload_fw(struct caliptra_buffer *fw_buffer);
 
 // Execute Mailbox Command
-int caliptra_mailbox_execute(struct caliptra_model *model, uint32_t cmd, struct caliptra_buffer *mbox_tx_buffer, struct caliptra_buffer *mbox_rx_buffer);
-
-#endif // CALIPTRA_API_H
+int caliptra_mailbox_execute(uint32_t cmd, struct caliptra_buffer *mbox_tx_buffer, struct caliptra_buffer *mbox_rx_buffer);

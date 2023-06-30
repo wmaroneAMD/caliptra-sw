@@ -16,6 +16,7 @@
 # Set Q= on the command line for verbosity
 Q=@
 
+# Set build targets, flags, and a defaultr
 ifeq ($(findstring "debug",$(MAKECMDGOALS)),"debug")
 CARGO_OUT = $(abspath ../target/debug)
 CARGO_FLAG =
@@ -27,14 +28,7 @@ CARGO_OUT = $(abspath ../target/debug)
 endif
 
 RTL_SOC_IFC_INCLUDE_PATH = ../hw-latest/caliptra-rtl/src/soc_ifc/rtl
-IMAGE_BUILDER_PATH = $(abspath ../builder)
 CFLAGS += -I$(RTL_SOC_IFC_INCLUDE_PATH) -I$(CARGO_OUT) -I$(abspath inc)
-
-LIBCALIPTRA_CARGO = $(CARGO_OUT)/libcaliptra_hw_model_c_binding.a
-LIBCALIPTRA = $(CARGO_OUT)/libcaliptra.a
-
-MODEL_HEADER_CARGO = $(CARGO_OUT)/caliptra_model.h
-MODEL_HEADER = $(abspath inc/caliptra_model.h)
 
 SOURCE += src/caliptra_api.c
 
@@ -45,32 +39,12 @@ CLEAN_TESTS = $(addprefix clean-, $(TESTS))
 
 .PHONY:%_test %_run clean $(CLEAN_TESTS)
 
-export CARGO_OUT
-export MODEL_HEADER
-export CFLAGS
-export IMAGE_BUILDER_PATH
-
 debug: all
 release: all
 tests: $(TESTS)
-all: $(LIBCALIPTRA) $(OBJS) $(TESTS)
+all: $(OBJS) $(TESTS)
 
-$(LIBCALIPTRA): $(OBJS) $(LIBCALIPTRA_CARGO)
-	@echo [COPY] $(LIBCALIPTRA_CARGO) -\> $(LIBCALIPTRA)
-	$(Q)cp $(LIBCALIPTRA_CARGO) $(LIBCALIPTRA)
-	@echo [AR] $(LIBCALIPTRA)
-	$(Q)$(AR) q $(CARGO_OUT)/libcaliptra.a $(OBJS)
-
-$(LIBCALIPTRA_CARGO) $(MODEL_HEADER_CARGO):
-	@echo [CARGO] $(LIBCALIPTRA_CARGO) $(MODEL_HEADER_CARGO)
-	$(Q)cd ../hw-model/c-binding
-	$(Q)cargo build $(CARGO_FLAG)
-
-$(MODEL_HEADER): $(MODEL_HEADER_CARGO)
-	@echo [COPY] $(MODEL_HEADER_CARGO) -\> $(MODEL_HEADER) 
-	$(Q)cp $(CARGO_OUT)/caliptra_model.h inc/
-
-$(OBJS): $(SOURCE) $(MODEL_HEADER)
+$(OBJS): $(SOURCE)
 	@echo [CC] $@
 	$(Q)$(CC) ${CFLAGS} -c $< -o $@
 
@@ -81,10 +55,13 @@ $(CLEAN_TESTS): FORCE
 FORCE:
 
 clean: $(CLEAN_TESTS)
-	@echo [CLEAN] $(CARGO_OUT) $(MODEL_HEADER) $(OBJS)
+	@echo [CLEAN] $(CARGO_OUT) $(OBJS)
 	$(Q)$(RM) -r $(CARGO_OUT)
-	$(Q)$(RM) $(MODEL_HEADER)
 	$(Q)$(RM) $(OBJS)
+
+export CARGO_OUT
+export MODEL_HEADER
+export CFLAGS
 
 %_test: $(MODEL_HEADER)
 	$(Q)$(MAKE) Q=$(Q) -C test/$*_test -f $*_test.mk
