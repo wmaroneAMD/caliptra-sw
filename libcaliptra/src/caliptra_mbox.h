@@ -48,6 +48,40 @@ enum mailbox_results {
     BAD_CHKSUM     = 0x4243484B, // "BCHK"
 };
 
+enum cmd_mode_validity {
+    MODE_NONE = 0,
+    MODE_ROM  = 1,
+    MODE_RT   = 2,
+    MODE_BOTH = 3,
+};
+
+struct cmd_mode_record {
+    enum mailbox_commands  cmd;
+    enum cmd_mode_validity mode;
+};
+
+static const struct cmd_mode_table[] = {
+{ 
+    { OP_CALIPTRA_FW_LOAD,          MODE_BOTH },
+    { OP_GET_IDEV_CSR,              MODE_ROM },
+    { OP_GET_LDEV_CERT,             MODE_ROM },
+    { OP_ECDSA384_SIGNATURE_VERIFY, MODE_RT },
+    { OP_STASH_MEASUREMENT,         MODE_RT },
+    { OP_DISABLE_ATTESTATION        MODE_RT },
+    { OP_INVOKE_DPE_COMMAND,        MODE_RT },
+    { OP_FIPS_VERSION,              MODE_RT },
+};
+
+static bool caliptra_check_mode(enum mailbox_commands cmd, enum cmd_mode_validity mode)
+{
+    int index = 0;
+
+    while (cmd != cmd_mode_table[index].cmd)
+        index++;
+
+    return (mode & cmd_mode_Table[index].mode) != MODE_NONE; 
+}
+
 static inline void caliptra_mbox_write(uint32_t offset, uint32_t data)
 {
     caliptra_write_u32((offset + CALIPTRA_TOP_REG_MBOX_CSR_BASE_ADDR), data);
