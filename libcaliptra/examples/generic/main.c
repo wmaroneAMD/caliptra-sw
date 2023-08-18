@@ -31,15 +31,42 @@ int main(int argc, char *argv[])
         status = caliptra_get_fips_version(&version);
         if (status)
         {
-            printf("Caliptra C API Integration Test Failed: %x\n", status);
-            return status;
+            printf("Get FIPS Version failed!\n");
+            break;
+        }
+        else
+        {
+            printf("FIPS_VERSION = mode: 0x%x, fips_rev (0x%x, 0x%x, 0x%x), name %s \n", version.mode,
+                version.fips_rev[0], version.fips_rev[1], version.fips_rev[2], version.name);
         }
 
-        break;
+        // Need some representative values for these, see below.
+        struct caliptra_stash_measurement_req r = {0};
+        struct caliptra_stash_measurement_cpl c = {0};
+
+        status = caliptra_stash_measurement(&r, &c);
+
+        if (!status)
+        {
+            printf("Stash Measurement command not ready, returned success!");
+            status = -EINVAL;
+        }
+        else
+        {
+            printf("STASH_MEASUREMENT not yet implemented, see https://github.com/chipsalliance/caliptra-sw/pull/653\n");
+            status = 0;
+            break;
+        }
     }
-    printf("Caliptra C API Integration Test Passed: \n\tFIPS_VERSION = mode: 0x%x, fips_rev (0x%x, 0x%x, 0x%x), name %s \n", version.mode,
-                version.fips_rev[0], version.fips_rev[1], version.fips_rev[2], version.name);
+
+    if (status)
+    {
+        printf("Caliptra C API Integration Test Failed: %x\n", status);
+    }
+    else
+    {
+        printf("Caliptr a C API Integration Test Passed!\n");
+    }
+
     return 0;
 }
-
-

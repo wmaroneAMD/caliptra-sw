@@ -44,11 +44,6 @@ static uint32_t calculate_caliptra_checksum(uint32_t cmd, uint8_t *buffer, uint3
     return (0 - sum);
 }
 
-static inline bool validate_caliptra_checksum(caliptra_checksum checksum, enum mailbox_command command, uint8_t *buffer, uint32_t length)
-{
-    return (checksum - calculate_caliptra_checksum(command, buffer, length) == 0);
-}
-
 static inline uint32_t caliptra_read_status(void)
 {
     uint32_t status;
@@ -280,6 +275,21 @@ int caliptra_upload_fw(struct caliptra_buffer *fw_buffer)
     return caliptra_mailbox_execute(OP_CALIPTRA_FW_LOAD, fw_buffer, NULL);
 }
 
+static int check_command_response(struct caliptra_completion *cpl, uint8_t *buffer, size_t buffer_size)
+{
+    uint32_t calc_checksum = calculate_caliptra_checksum(0, buffer + sizeof(uint32_t), buffer_size - sizeof(uint32_t));
+
+    bool checksum_valid = !(cpl->checksum - calc_checksum);
+    bool fips_approved  = (cpl->fips == FIPS_STATUS_APPROVED);
+
+    if ((checksum_valid == false) || (fips_approved == false))
+    {
+        return -EBADMSG;
+    }
+
+    return 0;
+}
+
 /**
  * caliptra_get_fips_version
  *
@@ -308,16 +318,39 @@ int caliptra_get_fips_version(struct caliptra_fips_version *version)
 
     int status = caliptra_mailbox_execute(OP_FIPS_VERSION, &in_buf, &out_buf);
 
-    if (!status)
+    if (status)
     {
         return status;
     }
 
-    bool checksum_valid = validate_caliptra_checksum(version->cpl.checksum, OP_FIPS_VERSION, (uint8_t*)version, sizeof(struct caliptra_fips_version));
-    bool fips_approved  = version->cpl.fips != FIPS_STATUS_APPROVED;
+    return check_command_response(&version->cpl, (uint8_t*)version, sizeof(struct caliptra_fips_version));
+}
 
-    if (!checksum_valid || !fips_approved)
+int caliptra_stash_measurement(struct caliptra_stash_measurement_req *req, struct caliptra_stash_measurement_cpl *cpl)
+{
+    if (!req || !cpl)
     {
-        return -EBADMSG;
+        return -EINVAL;
     }
+
+    struct caliptra_buffer in_buf = {
+        .data = (uint8_t*)req,
+        .len  = sizeof(struct caliptra_stash_measurement_req),
+    };
+
+    struct caliptra_buffer out_buf = {
+        .data = (uint8_t*)cpl,
+        .len  = sizeof(struct caliptra_stash_measurement_cpl),
+    };
+
+    req->checksum = calculate_caliptra_checksum(OP_STASH_MEASUREMENT, (uint8_t*)req, sizeof(struct caliptra_stash_measurement_req));
+
+    int status = caliptra_mailbox_execute(OP_STASH_MEASUREMENT, &in_buf, &out_buf);
+
+    if (status)
+    {
+        return status;
+    }
+
+    return check_command_response(&cpl->cpl, (uint8_t*)cpl, sizeof(struct caliptra_stash_measurement_cpl));
 }
