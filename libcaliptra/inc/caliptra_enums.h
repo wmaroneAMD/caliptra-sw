@@ -31,3 +31,20 @@ enum toc_entry_id {
     MAX     = 0xFFFFFFFF,
 };
 
+// The below enums are placeholders to set up the baseline
+// required for communication of DPE commands to Caliptra
+// firmware.
+
+enum dpe_commands {
+    DPE_GET_PROFILE        = 0x0,
+    DPE_INITIALIZE_CONTEXT = 0x1,
+    DPE_DERIVE_CHILD       = 0x2,
+    DPE_CERTIFY_KEY        = 0x3,
+    DPE_SIGN               = 0x4,
+    DPE_ROTATE_CTX_HANDLE  = 0x5,
+    DPE_DESTROY_CTX        = 0x6,
+    DPE_GET_CERT_CHAIN     = 0x7,
+    DPE_EXTEND_TCI         = 0x8,
+    DPE_TAG_TCI            = 0x9,
+    DPE_GET_TAGGED_TCI     = 0xA,
+};

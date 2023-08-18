@@ -63,3 +63,32 @@ struct caliptra_stash_measurement_cpl {
     struct caliptra_completion cpl;
     uint32_t                   dpe_result;
 };
+
+
+// The below fields are placeholders to set up the baseline
+// required for communication of DPE commands to Caliptra
+// firmware.
+
+#define DPE_DATA_MAX 504
+
+struct dpe_command {
+    uint32_t command;
+    uint8_t  data[DPE_DATA_MAX];
+};
+
+struct dpe_response {
+    uint32_t response;
+    uint8_t  data[DPE_DATA_MAX];
+};
+
+struct caliptra_dpe_req {
+    caliptra_checksum  checksum;
+    uint32_t           data_size;
+    struct dpe_command command;
+};
+
+struct caliptra_dpe_cpl {
+    struct caliptra_completion cpl;
+    uint32_t                   data_size;
+    struct dpe_response        response;
+};

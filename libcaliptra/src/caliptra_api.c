@@ -275,7 +275,7 @@ int caliptra_upload_fw(struct caliptra_buffer *fw_buffer)
     return caliptra_mailbox_execute(OP_CALIPTRA_FW_LOAD, fw_buffer, NULL);
 }
 
-static int check_command_response(struct caliptra_completion *cpl, uint8_t *buffer, size_t buffer_size)
+static inline int check_command_response(struct caliptra_completion *cpl, uint8_t *buffer, size_t buffer_size)
 {
     uint32_t calc_checksum = calculate_caliptra_checksum(0, buffer + sizeof(uint32_t), buffer_size - sizeof(uint32_t));
 
@@ -290,6 +290,36 @@ static int check_command_response(struct caliptra_completion *cpl, uint8_t *buff
     return 0;
 }
 
+static int pack_and_send_command(struct parcel *parcel)
+{
+    if (parcel == NULL)
+    {
+        return -EINVAL;
+    }
+
+    struct caliptra_buffer in_buf = {
+        .data = parcel->tx_buffer,
+        .len  = parcel->tx_bytes,
+    };
+
+    struct caliptra_buffer out_buf = {
+        .data = parcel->rx_buffer,
+        .len  = parcel->rx_bytes,
+    };
+
+    *((caliptra_checksum*)parcel->tx_buffer) = calculate_caliptra_checksum(parcel->command, parcel->tx_buffer, parcel->tx_bytes);
+
+    int status = caliptra_mailbox_execute(parcel->command, &in_buf, &out_buf);
+
+    if (status)
+    {
+        return status;
+    }
+
+    struct caliptra_completion *cpl = (struct caliptra_completion*)parcel->rx_buffer;
+
+    return check_command_response(cpl, parcel->rx_buffer, parcel->rx_bytes);
+}
 /**
  * caliptra_get_fips_version
  *
@@ -305,25 +335,17 @@ int caliptra_get_fips_version(struct caliptra_fips_version *version)
     if (version == NULL)
         return -EINVAL;
 
-    caliptra_checksum checksum = calculate_caliptra_checksum(OP_FIPS_VERSION, NULL, 0);
+    caliptra_checksum checksum = 0;
 
-    struct caliptra_buffer in_buf = {
-        .data = (uint8_t *)&checksum,
-        .len = sizeof(checksum),
+    struct parcel p = {
+        .command   = OP_FIPS_VERSION,
+        .tx_buffer = (uint8_t*)&checksum,
+        .tx_bytes  = sizeof(caliptra_checksum),
+        .rx_buffer = (uint8_t*)version,
+        .rx_bytes  = sizeof(struct caliptra_fips_version),
     };
-    struct caliptra_buffer out_buf = {
-        .data = (uint8_t *)version,
-        .len = sizeof(struct caliptra_fips_version),
-    };
 
-    int status = caliptra_mailbox_execute(OP_FIPS_VERSION, &in_buf, &out_buf);
-
-    if (status)
-    {
-        return status;
-    }
-
-    return check_command_response(&version->cpl, (uint8_t*)version, sizeof(struct caliptra_fips_version));
+    return pack_and_send_command(&p);
 }
 
 int caliptra_stash_measurement(struct caliptra_stash_measurement_req *req, struct caliptra_stash_measurement_cpl *cpl)
@@ -333,24 +355,31 @@ int caliptra_stash_measurement(struct caliptra_stash_measurement_req *req, struc
         return -EINVAL;
     }
 
-    struct caliptra_buffer in_buf = {
-        .data = (uint8_t*)req,
-        .len  = sizeof(struct caliptra_stash_measurement_req),
+    struct parcel p = {
+        .command = OP_STASH_MEASUREMENT,
+        .tx_buffer = (uint8_t*)req,
+        .tx_size   = sizeof(struct caliptra_stash_measurement_req),
+        .rx_buffer = (uint8_t*)cpl,
+        .rx_size   = sizeof(struct caliptra_stash_measurement_cpl),
     };
 
-    struct caliptra_buffer out_buf = {
-        .data = (uint8_t*)cpl,
-        .len  = sizeof(struct caliptra_stash_measurement_cpl),
-    };
+    return pack_and_send_command(&p);
+}
 
-    req->checksum = calculate_caliptra_checksum(OP_STASH_MEASUREMENT, (uint8_t*)req, sizeof(struct caliptra_stash_measurement_req));
-
-    int status = caliptra_mailbox_execute(OP_STASH_MEASUREMENT, &in_buf, &out_buf);
-
-    if (status)
+int caliptra_dpe_command(struct caliptra_dpe_req *req, struct caliptra_dpe_cpl *cpl)
+{
+    if (!req || !cpl)
     {
-        return status;
+        return -EINVAL;
     }
 
-    return check_command_response(&cpl->cpl, (uint8_t*)cpl, sizeof(struct caliptra_stash_measurement_cpl));
+    struct parcel p = {
+        .command   = OP_INVOKE_DPE_COMMAND,
+        .tx_buffer = (uint8_t*)req,
+        .tx_size   = sizeof(struct caliptra_dpe_req),
+        .rx_buffer = (uint8_t*)cpl,
+        .rx_size   = sizeof(struct caliptra_dpe_cpl),
+    };
+
+    return pack_and_send_command(&p);
 }
